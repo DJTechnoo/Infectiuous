@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+    <canvas id="canvas" width="1024" height="512"/>
+    <script>
+
+const CANVAS = document.getElementById("canvas");
+const C = CANVAS.getContext("2d");
+const W = CANVAS.width;
+const H = CANVAS.height;
+
+//------- VECTOR CLASS ---------------
+function vec(x, y)
+{
+	this.x = x;
+	this.y = y;
+}
+
+vec.prototype.add = function(v)
+{
+	return new vec( this.x + v.x,
+			this.y + v.y);
+}
+
+
+vec.prototype.sub = function(v)
+{
+	return new vec( this.x - v.x,
+			this.y - v.y);
+}
+
+
+vec.prototype.scale = function(f)
+{
+	this.x *= f;
+	this.y *= f;
+}
+
+var mouse = {
+    x:0,
+    y:0
+};
+
+
+
+var ctrl = {
+	l : false,
+	r : false,
+	f : false,
+	b : false,
+	fire : false,
+}
+
+
+
+function keyboardHandler(evt)
+{
+	var state = (evt.type == "keydown")? true : false;
+	switch(evt.key)
+	{
+		case 'a': ctrl.l = state; break; //rec.rotate(-0.1); break;
+		case 'w': ctrl.f = state; break; //rec.updateTarget(200); break;
+		case 'd': ctrl.r = state; break; //rec.rotate(0.1); break;
+		case 's': ctrl.b = state; break; //rec.updateTarget(-200); break;
+		
+	}	
+}
+
+
+function mouseMove(evt){
+    mouse.x = evt.clientX;
+    mouse.y = evt.clientY;
+}
+
+
+
+function clear(){
+    C.clearRect(0, 0, W, H);
+    C.fillRect(0, 0, W, H);
+}
+
+
+function rect(x, y, w, h, col){
+    C.fillStyle = col;
+    C.fillRect(x, y, w, h);
+}
+
+function circle(x, y, s, col){
+    C.beginPath();
+    C.arc(x, y, s, 0, 2 * Math.PI);
+    C.fillStyle = col;
+    C.fill();
+}
+
+
+function lerp(a, b){
+    return a + (b-a)* 0.09;
+    
+}
+
+function interval(s, h)
+{
+	return Math.random()*(h-s) + s;
+}
+
+
+function follow(a, b){
+    a.x = lerp(a.x, b.x);
+    a.y = lerp(a.y, b.y);
+}
+
+function Rect(x, y, s, col){
+	this.pos = new vec(x, y);
+	this.vel = new vec(0, 0);
+	this.s = s;
+	this.rot = 0;
+	this.rotSpd = (1/(this.s * this.s))*3;
+	this.col = col;
+	this.target = new vec(  interval(50, 450),
+				interval(50, 450));
+	this.strength = 0.04;
+	this.drag =	0.94;
+	this.force = new vec(0, 0);
+
+
+	this.updateTarget = function(spd)
+	{
+		this.target.x += Math.cos(this.rot * Math.PI/4) * spd; // dt
+		this.target.y += Math.sin(this.rot * Math.PI/4) * spd; // dt
+		
+	}
+
+	this.backForce = function()
+	{
+		this.target.x -= Math.cos(this.rot * Math.PI/4) * 1; // dt
+		this.target.y -= Math.sin(this.rot * Math.PI/4) * 1; // dt
+		
+	}
+
+
+	this.rotate = function(r)
+	{
+
+		this.rot += r; // dt
+	}
+
+
+	this.update = function()
+	{
+		this.force = this.target.sub(this.pos); 
+		this.force.scale(this.strength);
+		this.vel.scale(this.drag);
+		this.vel = this.vel.add(this.force);
+		this.pos = this.pos.add(this.vel);
+		//this.rot += this.rotSpd;
+
+		C.save();
+		C.translate(this.pos.x+this.s/2, this.pos.y+this.s/2);
+		C.rotate(this.rot * Math.PI/4);
+		C.fillStyle = this.col;
+		C.fillRect(-this.s/2, -this.s/2, this.s, this.s);
+		C.restore();
+
+	}
+}
+
+
+
+
+
+
+// setup:
+document.addEventListener("mousemove", mouseMove);
+window.addEventListener("keydown", keyboardHandler);
+window.addEventListener("keyup", keyboardHandler);
+
+// objects
+var player = new Rect(300, 300, 40, "blue");
+
+
+
+function gameLoop(){
+   clear();
+   if(ctrl.f) player.updateTarget(1);
+   if(ctrl.b) player.updateTarget(-1);
+   if(ctrl.l) player.rotate(-0.05);
+   if(ctrl.r) player.rotate(0.05);
+   player.update();
+   
+   requestAnimationFrame(gameLoop);
+   
+}
+
+gameLoop();
+
+
+    </script>
+</html>
