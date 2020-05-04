@@ -28,6 +28,10 @@ vec.prototype.sub = function(v)
 			this.y - v.y);
 }
 
+vec.prototype.length = function(){
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+}
+
 
 vec.prototype.scale = function(f)
 {
@@ -57,10 +61,11 @@ function keyboardHandler(evt)
 	var state = (evt.type == "keydown")? true : false;
 	switch(evt.key)
 	{
-		case 'a': ctrl.l = state; break; //rec.rotate(-0.1); break;
-		case 'w': ctrl.f = state; break; //rec.updateTarget(200); break;
-		case 'd': ctrl.r = state; break; //rec.rotate(0.1); break;
-		case 's': ctrl.b = state; break; //rec.updateTarget(-200); break;
+		case 'a': ctrl.l = state; break; 
+		case 'w': ctrl.f = state; break; 
+		case 'd': ctrl.r = state; break; 
+		case 's': ctrl.b = state; break; 
+		case 'e': ctrl.fire = state; break;
 		
 	}	
 }
@@ -75,6 +80,7 @@ function mouseMove(evt){
 
 function clear(){
     C.clearRect(0, 0, W, H);
+	C.fillStyle = "black";
     C.fillRect(0, 0, W, H);
 }
 
@@ -103,10 +109,68 @@ function interval(s, h)
 }
 
 
-function follow(a, b){
-    a.x = lerp(a.x, b.x);
-    a.y = lerp(a.y, b.y);
+function Droplet(x, y, infectious, recharge){
+	this.pos = new vec(x, y);
+	this.vel = new vec(interval(-0.7, 0.7), interval(-0.7, 0.7));
+	this.s = interval(2, 4);
+	this.col = "white";
+	if(infectious) this.col = "red";
+	this.infectious = infectious;
+	this.dead = false;
+	this.hasRecharge = recharge;
+	if(this.hasRecharge) this.col = "orange";
+	
+	
+	this.update = function(){
+		this.pos = this.pos.add(this.vel);
+		
+		circle(this.pos.x, this.pos.y, this.s, this.col);
+		if(!this.dead){
+			this.s -= 0.01;
+			if(this.s < 0.1) this.dead = true;
+		}
+	}
 }
+
+
+function Guy(col){
+	this.pos = new vec(interval(50, W-50), interval(50, H-50));
+	this.col = col;
+	this.s = 20;
+	this.rand = 0;
+	this.coughReq = 9990;
+	this.sick = false;
+	
+	this.cough = function(){
+		for(let i = 0; i < 10; i++){
+			let recharge = false;
+			if(!this.sick){
+				let rechargeOccation = interval(0,1000);
+				if(rechargeOccation > 999) recharge = true;
+			}
+			droplets.push(new Droplet(this.pos.x, this.pos.y, this.sick, recharge))
+		}
+	}
+	
+	this.update = function(){
+		this.rand = interval(0, 10000);
+		for(let i = droplets.length-1; i >= 0; i--){
+			
+			let lenVec = droplets[i].pos.sub(this.pos).length();
+			if(lenVec < this.s){
+				if(droplets[i].infectious){
+					this.sick = true;
+					this.col = "pink";
+				}
+			}
+		}
+		
+		if(this.rand > this.coughReq) this.cough();
+		C.fillStyle = this.col;
+		C.fillRect(this.pos.x-this.s/2, this.pos.y-this.s/2, this.s, this.s);
+	}
+}
+
 
 function Rect(x, y, s, col){
 	this.pos = new vec(x, y);
@@ -120,6 +184,7 @@ function Rect(x, y, s, col){
 	this.strength = 0.04;
 	this.drag =	0.94;
 	this.force = new vec(0, 0);
+	this.coughed = false;
 
 
 	this.updateTarget = function(spd)
@@ -142,6 +207,13 @@ function Rect(x, y, s, col){
 
 		this.rot += r; // dt
 	}
+	
+	this.cough = function(){
+		if(!this.coughed)
+			for(let i = 0; i < 10; i++)
+				droplets.push(new Droplet(this.pos.x+this.s/2, this.pos.y+this.s/2, true, false))
+		this.coughed = true;
+	}
 
 
 	this.update = function()
@@ -151,7 +223,15 @@ function Rect(x, y, s, col){
 		this.vel.scale(this.drag);
 		this.vel = this.vel.add(this.force);
 		this.pos = this.pos.add(this.vel);
-		//this.rot += this.rotSpd;
+		
+		for(let i in droplets){
+			let lenVec = droplets[i].pos.sub(this.pos).length();
+				if(lenVec < this.s){
+					if(droplets[i].hasRecharge){
+						this.coughed = false;
+					}
+				}
+		}
 
 		C.save();
 		C.translate(this.pos.x+this.s/2, this.pos.y+this.s/2);
@@ -167,24 +247,36 @@ function Rect(x, y, s, col){
 
 
 
+// objects
+var player = new Rect(300, 300, 20, "orange");
+var droplets = [];
+var guys = [];
 
 // setup:
 document.addEventListener("mousemove", mouseMove);
 window.addEventListener("keydown", keyboardHandler);
 window.addEventListener("keyup", keyboardHandler);
 
-// objects
-var player = new Rect(300, 300, 40, "blue");
+for(let i = 0; i < 20; i++)
+	guys.push(new Guy("cyan"));
 
 
 
 function gameLoop(){
-   clear();
-   if(ctrl.f) player.updateTarget(1);
-   if(ctrl.b) player.updateTarget(-1);
-   if(ctrl.l) player.rotate(-0.05);
-   if(ctrl.r) player.rotate(0.05);
-   player.update();
+	clear();
+	if(ctrl.f) player.updateTarget(1);
+	if(ctrl.b) player.updateTarget(-1);
+	if(ctrl.l) player.rotate(-0.05);
+	if(ctrl.r) player.rotate(0.05);
+	if(ctrl.fire) player.cough();
+	player.update();
+   
+	for(let i = droplets.length-1; i >= 0; i--){
+		droplets[i].update();
+		if(droplets[i].dead) droplets.splice(i,1);
+	}
+	for(let i in guys)
+		guys[i].update();
    
    requestAnimationFrame(gameLoop);
    
